@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Planner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            width: calc(100% - 10px);
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .btn {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        #planner-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .list-item {
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+            border-left: 5px solid #007BFF;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+            color: #fff;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('planner-form');
+            const plannerList = document.getElementById('planner-list');
+            const plannerData = JSON.parse(localStorage.getItem('plannerData')) || [];
+
+            // Load existing planner data from localStorage
+            plannerData.forEach(plan => {
+                addPlanToList(plan.subject, plan.date, plan.time);
+            });
+
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const subject = document.getElementById('subject').value;
+                const date = document.getElementById('date').value;
+                const time = document.getElementById('time').value;
+
+                // Add study plan to list
+                addPlanToList(subject, date, time);
+
+                // Save to localStorage
+                plannerData.push({ subject, date, time });
+                localStorage.setItem('plannerData', JSON.stringify(plannerData));
+
+                // Set up notification alert
+                scheduleNotification(subject, date, time);
+
+                form.reset();
+            });
+
+            function addPlanToList(subject, date, time) {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-item';
+                listItem.textContent = `${subject} on ${date} at ${time}`;
+
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-btn';
+                deleteButton.textContent = 'Delete';
+                deleteButton.addEventListener('click', function() {
+                    plannerList.removeChild(listItem);
+                    removePlanFromStorage(subject, date, time);
+                });
+
+                listItem.appendChild(deleteButton);
+                plannerList.appendChild(listItem);
+            }
+
+            function removePlanFromStorage(subject, date, time) {
+                const index = plannerData.findIndex(plan => plan.subject === subject && plan.date === date && plan.time === time);
+                if (index !== -1) {
+                    plannerData.splice(index, 1);
+                    localStorage.setItem('plannerData', JSON.stringify(plannerData));
+                }
+            }
+
+            function scheduleNotification(subject, date, time) {
+                const studyDateTime = new Date(`${date}T${time}`).getTime();
+                const now = new Date().getTime();
+                const timeUntilStudy = studyDateTime - now;
+
+                if (timeUntilStudy > 0) {
+                    setTimeout(() => {
+                        alert(`Time to study ${subject}!`);
+                    }, timeUntilStudy);
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Study Planner</h1>
+        <form id="planner-form">
+            <div class="form-group">
+                <label for="subject">Subject:</label>
+                <input type="text" id="subject" name="subject" required>
+            </div>
+            <div class="form-group">
+                <label for="date">Date:</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="form-group">
+                <label for="time">Time:</label>
+                <input type="time" id="time" name="time" required>
+            </div>
+            <button type="submit" class="btn">Add Plan</button>
+        </form>
+
+        <h2>Upcoming Study Plans</h2>
+        <ul id="planner-list"></ul>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js').then(function(registration) {
+                console.log('Service Worker registered with scope:', registration.scope);
+            }).catch(function(error) {
+                console.log('Service Worker registration failed:', error);
+            });
+        }
+    </script>
+</body>
+</html>
+
+/* service-worker.js */
+self.addEventListener('install', function(event) {
+    event.waitUntil(
+        caches.open('study-planner-cache').then(function(cache) {
+            return cache.addAll([
+                './',
+                './index.html',
+                './styles.css',  // If you have external styles
+                './script.js'    // If you have external JavaScript
+            ]);
+        })
+    );
+});
+
+self.addEventListener('fetch', function(event) {
+    event.respondWith(
+        caches.match(event.request).then(function(response) {
+            return response || fetch(event.request);
+        })
+    );
+});
